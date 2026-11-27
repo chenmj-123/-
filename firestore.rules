@@ -1,0 +1,205 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helper Primitives ---
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isBootstrappedAdmin() {
+      return isVerifiedUser() && request.auth.token.email == 'chenmj@tmail.ilc.edu.tw';
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin() || (
+        isVerifiedUser() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // --- Validation Blueprints ---
+    function isValidAward(data) {
+      return data.keys().hasAll([
+        'title',
+        'recipientName',
+        'awardDate',
+        'awardYear',
+        'category',
+        'mediaType',
+        'mediaUrl',
+        'accessionNumber',
+        'issuingBody',
+        'notes',
+        'isPublic',
+        'createdBy',
+        'createdByName',
+        'createdAt',
+        'updatedAt'
+      ])
+      && data.keys().hasOnly([
+        'title',
+        'recipientName',
+        'awardDate',
+        'awardYear',
+        'category',
+        'mediaType',
+        'mediaUrl',
+        'accessionNumber',
+        'issuingBody',
+        'notes',
+        'isPublic',
+        'createdBy',
+        'createdByName',
+        'createdAt',
+        'updatedAt'
+      ])
+      && data.title is string && data.title.size() >= 1 && data.title.size() <= 200
+      && data.recipientName is string && data.recipientName.size() >= 1 && data.recipientName.size() <= 120
+      && data.awardDate is string && data.awardDate.size() == 10 && data.awardDate.matches('^\\d{4}-\\d{2}-\\d{2}$')
+      && data.awardYear is int && data.awardYear >= 1964 && data.awardYear <= 2100
+      && data.category in ['trophy', 'certificate', 'medal', 'building']
+      && data.mediaType in ['photo', 'video']
+      && data.mediaUrl is string && data.mediaUrl.size() >= 1 && data.mediaUrl.size() <= 1000
+      && data.accessionNumber is string && data.accessionNumber.size() >= 1 && data.accessionNumber.size() <= 40 && data.accessionNumber.matches('^[a-zA-Z0-9_\\-]+$')
+      && data.issuingBody is string && data.issuingBody.size() <= 160
+      && data.notes is string && data.notes.size() <= 1000
+      && data.isPublic is bool
+      && data.createdBy is string && data.createdBy.size() >= 1 && data.createdBy.size() <= 128
+      && data.createdByName is string && data.createdByName.size() <= 120
+      && data.createdAt is timestamp
+      && data.updatedAt is timestamp;
+    }
+
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['uid', 'displayName', 'email', 'role', 'updatedAt'])
+      && data.keys().hasOnly(['uid', 'displayName', 'email', 'role', 'updatedAt'])
+      && data.uid is string && data.uid == request.auth.uid && data.uid.size() <= 128
+      && data.displayName is string && data.displayName.size() <= 120
+      && data.email is string && data.email.size() <= 160
+      && data.role == 'archivist'
+      && data.updatedAt is timestamp;
+    }
+
+    function isValidAdminRegistry(data) {
+      return data.keys().hasAll(['email', 'displayName', 'createdAt'])
+      && data.keys().hasOnly(['email', 'displayName', 'createdAt'])
+      && data.email is string && data.email.size() >= 3 && data.email.size() <= 160
+      && data.displayName is string && data.displayName.size() <= 120
+      && data.createdAt is timestamp;
+    }
+
+    // --- Collection Rules ---
+    match /awards/{awardId} {
+      allow get: if isValidId(awardId) && (
+        existing().isPublic == true ||
+        (isVerifiedUser() && existing().createdBy == request.auth.uid) ||
+        isAdmin()
+      );
+
+      allow list: if resource.data.isPublic == true ||
+        (isVerifiedUser() && resource.data.createdBy == request.auth.uid) ||
+        isBootstrappedAdmin();
+
+      allow create: if isVerifiedUser()
+        && isValidId(awardId)
+        && isValidAward(incoming())
+        && incoming().createdBy == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isVerifiedUser()
+        && isValidId(awardId)
+        && isValidAward(incoming())
+        && incoming().createdBy == existing().createdBy
+        && incoming().createdAt == existing().createdAt
+        && incoming().accessionNumber == existing().accessionNumber
+        && incoming().updatedAt == request.time
+        && (
+          (
+            isAdmin() &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'title', 'recipientName', 'awardDate', 'awardYear',
+              'category', 'mediaType', 'mediaUrl', 'issuingBody',
+              'notes', 'isPublic', 'updatedAt'
+            ])
+          ) ||
+          (
+            existing().createdBy == request.auth.uid &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'title', 'recipientName', 'awardDate', 'awardYear',
+              'category', 'mediaType', 'mediaUrl', 'issuingBody',
+              'notes', 'isPublic', 'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isVerifiedUser()
+        && isValidId(awardId)
+        && (existing().createdBy == request.auth.uid || isAdmin());
+    }
+
+    match /users/{userId} {
+      allow get: if isValidId(userId) && isVerifiedUser() && (request.auth.uid == userId || isAdmin());
+      allow list: if isBootstrappedAdmin();
+      allow create: if isVerifiedUser()
+        && isValidId(userId)
+        && request.auth.uid == userId
+        && isValidUserProfile(incoming())
+        && incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser()
+        && isValidId(userId)
+        && request.auth.uid == userId
+        && isValidUserProfile(incoming())
+        && incoming().uid == existing().uid
+        && incoming().role == existing().role
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'email', 'updatedAt']);
+      allow delete: if isAdmin() && isValidId(userId);
+    }
+
+    match /admins/{adminId} {
+      allow get: if isValidId(adminId) && (
+        (isVerifiedUser() && request.auth.uid == adminId) ||
+        isAdmin()
+      );
+      allow list: if isBootstrappedAdmin();
+      allow create: if isAdmin()
+        && isValidId(adminId)
+        && isValidAdminRegistry(incoming())
+        && incoming().createdAt == request.time;
+      allow update: if isAdmin()
+        && isValidId(adminId)
+        && isValidAdminRegistry(incoming())
+        && incoming().createdAt == existing().createdAt
+        && incoming().diff(existing()).affectedKeys().hasOnly(['email', 'displayName']);
+      allow delete: if isAdmin() && isValidId(adminId);
+    }
+
+    match /test/connection {
+      allow get: if true;
+    }
+  }
+}

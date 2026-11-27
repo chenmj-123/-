@@ -1,0 +1,178 @@
+{
+  "entities": {
+    "AwardArtifact": {
+      "title": "AwardArtifact",
+      "description": "A digitized trophy, certificate, medal, or historic building archived by Xinsheng Elementary School.",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Name of the award or competition honor.",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "recipientName": {
+          "type": "string",
+          "description": "Name of the winning student, teacher, or school team.",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "awardDate": {
+          "type": "string",
+          "description": "ISO date string YYYY-MM-DD when the award was won.",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "awardYear": {
+          "type": "integer",
+          "description": "Four-digit calendar year extracted from awardDate."
+        },
+        "category": {
+          "type": "string",
+          "description": "Type of physical award artifact or historic building.",
+          "enum": ["trophy", "certificate", "medal", "building"]
+        },
+        "mediaType": {
+          "type": "string",
+          "description": "Whether the digitized record is a photograph or video.",
+          "enum": ["photo", "video"]
+        },
+        "mediaUrl": {
+          "type": "string",
+          "description": "URL path to the uploaded or archival image/video asset.",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "accessionNumber": {
+          "type": "string",
+          "description": "Unique archival catalog identifier such as XS-1994-001.",
+          "minLength": 1,
+          "maxLength": 40,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "issuingBody": {
+          "type": "string",
+          "description": "Organization or institution presenting the award.",
+          "maxLength": 160
+        },
+        "notes": {
+          "type": "string",
+          "description": "Curatorial notes, material description, or preservation condition.",
+          "maxLength": 1000
+        },
+        "isPublic": {
+          "type": "boolean",
+          "description": "Whether the artifact is displayed in the public exhibition."
+        },
+        "createdBy": {
+          "type": "string",
+          "description": "UID of the archivist who digitized this record.",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "createdByName": {
+          "type": "string",
+          "description": "Display name of the archivist.",
+          "maxLength": 120
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of initial archival creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of last modification."
+        }
+      },
+      "required": [
+        "title",
+        "recipientName",
+        "awardDate",
+        "awardYear",
+        "category",
+        "mediaType",
+        "mediaUrl",
+        "accessionNumber",
+        "issuingBody",
+        "notes",
+        "isPublic",
+        "createdBy",
+        "createdByName",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Private user account metadata for signed-in school archivists.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "displayName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "role": {
+          "type": "string",
+          "enum": ["archivist"]
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "displayName", "email", "role", "updatedAt"]
+    },
+    "AdminRegistry": {
+      "title": "AdminRegistry",
+      "description": "Trusted registry of school archive administrators.",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "displayName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["email", "displayName", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/awards/{awardId}": {
+      "schema": {
+        "$ref": "#/entities/AwardArtifact"
+      },
+      "description": "Digitized trophies, certificates, medals, and historic buildings for public exhibition and internal archival."
+    },
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/UserProfile"
+      },
+      "description": "Private profile records for school archivists, isolated to owner and admin."
+    },
+    "/admins/{adminId}": {
+      "schema": {
+        "$ref": "#/entities/AdminRegistry"
+      },
+      "description": "Trusted administrator role registry."
+    }
+  }
+}

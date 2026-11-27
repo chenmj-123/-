@@ -1,0 +1,6 @@
+{
+  "name": "宜蘭市新生國小獎項數位典藏館",
+  "description": "宜蘭縣宜蘭市新生國民小學自1964年創校以來的獎盃、獎狀與獎牌數位化拍照攝影歸檔及公開展示平台。",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
